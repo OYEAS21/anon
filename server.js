@@ -70,7 +70,7 @@ app.get('/admin', (req, res) => {
 
 app.post('/admin', (req, res) => {
   const { password } = req.body;
-  //if (password !== ADMIN_PASSWORD) {
+  if (password !== ADMIN_PASSWORD) {
     return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
   }
 
