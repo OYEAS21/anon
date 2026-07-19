@@ -3,7 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,54 +11,56 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-// ---------- База данных ----------
-const db = new sqlite3.Database('./chat.db');
+// ---------- Хранилище в JSON-файлах ----------
+const SESSIONS_FILE = './sessions.json';
+const MESSAGES_FILE = './messages.json';
 
-db.serialize(() => {
-  // Таблица сессий
-  db.run(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      socketId TEXT,
-      gender TEXT,
-      age TEXT,
-      startTime INTEGER,
-      endTime INTEGER,
-      messagesCount INTEGER DEFAULT 0
-    )
-  `);
-  // Таблица сообщений
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId INTEGER,
-      roomId TEXT,
-      senderId TEXT,
-      text TEXT,
-      timestamp INTEGER,
-      FOREIGN KEY (sessionId) REFERENCES sessions(id)
-    )
-  `);
-});
+// Загружаем данные из файлов (или создаём пустые)
+function loadData(file) {
+  try {
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+  } catch (e) { console.error('Ошибка загрузки', file, e); }
+  return [];
+}
+
+function saveData(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+}
+
+let sessions = loadData(SESSIONS_FILE);
+let messages = loadData(MESSAGES_FILE);
+
+// Вспомогательная функция для сохранения сессии
+function saveSession(session) {
+  // Ищем существующую
+  const index = sessions.findIndex(s => s.id === session.id);
+  if (index !== -1) {
+    sessions[index] = session;
+  } else {
+    sessions.push(session);
+  }
+  saveData(SESSIONS_FILE, sessions);
+}
 
 // ---------- Middleware ----------
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 app.use(express.json());
 
-// ---------- Админ-панель (только для владельца) ----------
-const ADMIN_PASSWORD = 'NKHG8DFHJs1'; // 🛠 Смените пароль!
+// ---------- Админ-панель ----------
+const ADMIN_PASSWORD = 'NKHG8DFHJs1'; // смените пароль!
 
 app.get('/admin', (req, res) => {
-  // Простая HTML-страница для просмотра логов
   res.send(`
     <!DOCTYPE html>
     <html>
-    <head><meta charset="UTF-8"><title>Админ-панель AnonChistopol</title></head>
+    <head><meta charset="UTF-8"><title>Админ-панель</title></head>
     <body style="font-family:sans-serif;background:#f7f9fc;padding:20px;">
       <h2>📊 Логи сессий и сообщений</h2>
       <form method="POST" action="/admin">
-        <label>Введите пароль: <input type="password" name="password" /></label>
+        <label>Пароль: <input type="password" name="password" /></label>
         <button type="submit">Войти</button>
       </form>
     </body>
@@ -72,99 +74,84 @@ app.post('/admin', (req, res) => {
     return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
   }
 
-  // Получаем последние 20 сессий и сообщений
-  db.all(`
-    SELECT s.*, 
-           (SELECT COUNT(*) FROM messages WHERE sessionId = s.id) as msgCount
-    FROM sessions s
-    ORDER BY s.startTime DESC
-    LIMIT 20
-  `, (err, sessions) => {
-    if (err) return res.send('Ошибка БД');
+  // Сортируем по времени (новые сверху)
+  const sortedSessions = [...sessions].sort((a,b) => b.startTime - a.startTime).slice(0, 20);
+  const sortedMessages = [...messages].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
 
-    db.all(`
-      SELECT m.*, s.gender, s.age 
-      FROM messages m
-      JOIN sessions s ON m.sessionId = s.id
-      ORDER BY m.timestamp DESC
-      LIMIT 50
-    `, (err2, messages) => {
-      if (err2) return res.send('Ошибка БД');
-
-      let html = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"><title>Логи</title>
-        <style>
-          body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
-          table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-          th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
-          th { background:#edf2f7; }
-          .section { margin-bottom:40px; }
-        </style>
-        </head>
-        <body>
-          <h1>📊 Админ-панель</h1>
-          <div class="section">
-            <h2>Последние сессии (20)</h2>
-            <table>
-              <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
-      `;
-      sessions.forEach(s => {
-        const start = new Date(s.startTime).toLocaleString('ru-RU');
-        const end = s.endTime ? new Date(s.endTime).toLocaleString('ru-RU') : '—';
-        html += `<tr><td>${s.id}</td><td>${s.socketId}</td><td>${s.gender}</td><td>${s.age}</td><td>${start}</td><td>${end}</td><td>${s.msgCount || 0}</td></tr>`;
-      });
-      html += `</table></div>`;
-
-      html += `<div class="section"><h2>Последние 50 сообщений</h2><table><tr><th>ID</th><th>Сессия</th><th>Пол</th><th>Возраст</th><th>Текст</th><th>Время</th></tr>`;
-      messages.forEach(m => {
-        const time = new Date(m.timestamp).toLocaleString('ru-RU');
-        html += `<tr><td>${m.id}</td><td>${m.sessionId}</td><td>${m.gender}</td><td>${m.age}</td><td>${m.text}</td><td>${time}</td></tr>`;
-      });
-      html += `</table></div></body></html>`;
-      res.send(html);
-    });
+  let html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><title>Логи</title>
+    <style>
+      body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
+      table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+      th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
+      th { background:#edf2f7; }
+      .section { margin-bottom:40px; }
+    </style>
+    </head>
+    <body>
+      <h1>📊 Админ-панель</h1>
+      <div class="section">
+        <h2>Последние сессии (20)</h2>
+        <table>
+          <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
+  `;
+  sortedSessions.forEach(s => {
+    const start = new Date(s.startTime).toLocaleString('ru-RU');
+    const end = s.endTime ? new Date(s.endTime).toLocaleString('ru-RU') : '—';
+    html += `<tr><td>${s.id}</td><td>${s.socketId}</td><td>${s.gender}</td><td>${s.age}</td><td>${start}</td><td>${end}</td><td>${s.messagesCount || 0}</td></tr>`;
   });
+  html += `</table></div>`;
+
+  html += `<div class="section"><h2>Последние 50 сообщений</h2><table><tr><th>ID</th><th>Сессия</th><th>Пол</th><th>Возраст</th><th>Текст</th><th>Время</th></tr>`;
+  sortedMessages.forEach(m => {
+    const time = new Date(m.timestamp).toLocaleString('ru-RU');
+    const session = sessions.find(s => s.id === m.sessionId);
+    html += `<tr><td>${m.id}</td><td>${m.sessionId}</td><td>${session ? session.gender : '?'}</td><td>${session ? session.age : '?'}</td><td>${m.text}</td><td>${time}</td></tr>`;
+  });
+  html += `</table></div></body></html>`;
+  res.send(html);
 });
 
-// ---------- Хранилище активных комнат и очереди ----------
+// ---------- Socket.IO логика ----------
+let nextSessionId = sessions.length > 0 ? Math.max(...sessions.map(s => s.id)) + 1 : 1;
+let nextMsgId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) + 1 : 1;
+
 const usersQueue = [];
 const activeRooms = new Map();
-
-// Хранилище сессий (socketId -> sessionId)
-const sessionMap = new Map();
+const sessionMap = new Map(); // socketId -> sessionId
 
 io.on('connection', (socket) => {
   console.log(`🔌 Подключился: ${socket.id}`);
 
-  // Создаём сессию в БД
-  db.run(
-    `INSERT INTO sessions (socketId, startTime) VALUES (?, ?)`,
-    [socket.id, Date.now()],
-    function(err) {
-      if (!err) {
-        sessionMap.set(socket.id, this.lastID);
-      }
-    }
-  );
+  // Создаём сессию
+  const session = {
+    id: nextSessionId++,
+    socketId: socket.id,
+    gender: 'any',
+    age: 'any',
+    startTime: Date.now(),
+    endTime: null,
+    messagesCount: 0
+  };
+  sessions.push(session);
+  saveData(SESSIONS_FILE, sessions);
+  sessionMap.set(socket.id, session.id);
 
   socket.on('find', (data) => {
     const { gender, age } = data;
-
-    // Обновляем сессию: сохраняем выбранные фильтры
-    const sessionId = sessionMap.get(socket.id);
-    if (sessionId) {
-      db.run(
-        `UPDATE sessions SET gender = ?, age = ? WHERE id = ?`,
-        [gender || 'any', age || 'any', sessionId]
-      );
+    // Обновляем сессию
+    const sess = sessions.find(s => s.id === sessionMap.get(socket.id));
+    if (sess) {
+      sess.gender = gender || 'any';
+      sess.age = age || 'any';
+      saveData(SESSIONS_FILE, sessions);
     }
 
-    const user = { socketId: socket.id, gender: gender || 'any', age: age || 'any' };
+    const user = { socketId: socket.id, gender: sess.gender, age: sess.age };
     usersQueue.push(user);
 
-    // Ищем пару (упрощённо: если пол совпадает, берём первого подходящего)
     let matchIndex = -1;
     for (let i = 0; i < usersQueue.length - 1; i++) {
       const candidate = usersQueue[i];
@@ -196,8 +183,6 @@ io.on('connection', (socket) => {
 
       io.to(socket.id).emit('connected', { roomId, partner: matchedUser.socketId });
       io.to(matchedUser.socketId).emit('connected', { roomId, partner: socket.id });
-
-      // Обновим сессии: запомним roomId? Не обязательно.
     } else {
       socket.emit('waiting', { message: 'Ожидаем собеседника...' });
     }
@@ -207,21 +192,28 @@ io.on('connection', (socket) => {
     const { roomId, text } = data;
     const sessionId = sessionMap.get(socket.id);
     if (sessionId) {
-      db.run(
-        `INSERT INTO messages (sessionId, roomId, senderId, text, timestamp) VALUES (?, ?, ?, ?, ?)`,
-        [sessionId, roomId, socket.id, text, Date.now()]
-      );
+      const msg = {
+        id: nextMsgId++,
+        sessionId: sessionId,
+        roomId: roomId,
+        senderId: socket.id,
+        text: text,
+        timestamp: Date.now()
+      };
+      messages.push(msg);
+      saveData(MESSAGES_FILE, messages);
+
       // Увеличиваем счётчик сообщений в сессии
-      db.run(
-        `UPDATE sessions SET messagesCount = messagesCount + 1 WHERE id = ?`,
-        [sessionId]
-      );
+      const sess = sessions.find(s => s.id === sessionId);
+      if (sess) {
+        sess.messagesCount = (sess.messagesCount || 0) + 1;
+        saveData(SESSIONS_FILE, sessions);
+      }
     }
     socket.to(roomId).emit('message', { from: socket.id, text, timestamp: Date.now() });
   });
 
   socket.on('next', () => {
-    // Закрываем комнату
     let roomToLeave = null;
     for (const [roomId, { user1, user2 }] of activeRooms.entries()) {
       if (user1 === socket.id || user2 === socket.id) {
@@ -234,25 +226,32 @@ io.on('connection', (socket) => {
       activeRooms.delete(roomToLeave);
       socket.leave(roomToLeave);
     }
-    // Закрываем сессию (время окончания)
+    // Закрываем сессию
     const sessionId = sessionMap.get(socket.id);
     if (sessionId) {
-      db.run(`UPDATE sessions SET endTime = ? WHERE id = ?`, [Date.now(), sessionId]);
+      const sess = sessions.find(s => s.id === sessionId);
+      if (sess) {
+        sess.endTime = Date.now();
+        saveData(SESSIONS_FILE, sessions);
+      }
     }
     socket.emit('disconnected', { message: 'Вы вышли из чата.' });
   });
 
   socket.on('disconnect', () => {
     console.log(`❌ Отключился: ${socket.id}`);
-    // Закрываем сессию
     const sessionId = sessionMap.get(socket.id);
     if (sessionId) {
-      db.run(`UPDATE sessions SET endTime = ? WHERE id = ?`, [Date.now(), sessionId]);
+      const sess = sessions.find(s => s.id === sessionId);
+      if (sess) {
+        sess.endTime = Date.now();
+        saveData(SESSIONS_FILE, sessions);
+      }
     }
     // Удаляем из очереди
     const idx = usersQueue.findIndex(u => u.socketId === socket.id);
     if (idx !== -1) usersQueue.splice(idx, 1);
-    // Закрываем активную комнату, если была
+    // Закрываем комнату
     for (const [roomId, { user1, user2 }] of activeRooms.entries()) {
       if (user1 === socket.id || user2 === socket.id) {
         const partnerId = user1 === socket.id ? user2 : user1;
