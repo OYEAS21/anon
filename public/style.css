@@ -288,3 +288,63 @@ footer {
         height: 350px;
     }
 }
+/* Мобильная адаптация */
+@media (max-width: 480px) {
+  #app {
+    padding: 16px 12px;
+    border-radius: 20px;
+  }
+  .logo {
+    font-size: 24px;
+  }
+  .online-info {
+    font-size: 14px;
+  }
+  .card {
+    padding: 20px 16px;
+  }
+  h2 {
+    font-size: 20px;
+  }
+  .filters label {
+    flex: 1 0 100%;
+  }
+  .filters select {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+  .btn-primary {
+    font-size: 16px;
+    padding: 12px 20px;
+  }
+  .chat-container {
+    height: 70vh;
+  }
+  .messages {
+    padding: 12px;
+  }
+  .chat-input {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chat-input input {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+  .chat-input .btn-primary {
+    font-size: 14px;
+    padding: 10px 16px;
+    width: 100%;
+  }
+  .chat-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chat-header span {
+    font-size: 14px;
+  }
+  .btn-secondary {
+    font-size: 13px;
+    padding: 6px 14px;
+  }
+}

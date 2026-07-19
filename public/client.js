@@ -4,6 +4,7 @@ let currentRoomId = null;
 let partnerId = null;
 let isConnected = false;
 let isChatEnded = false;
+let typingTimer = null;
 
 const mainScreen = document.getElementById('mainScreen');
 const chatScreen = document.getElementById('chatScreen');
@@ -14,6 +15,7 @@ const messageInput = document.getElementById('messageInput');
 const messagesDiv = document.getElementById('messages');
 const statusMessage = document.getElementById('statusMessage');
 const onlineCountSpan = document.getElementById('onlineCount');
+const typingIndicator = document.getElementById('typingIndicator');
 
 const genderFilter = document.getElementById('genderFilter');
 const ageFilter = document.getElementById('ageFilter');
@@ -23,25 +25,65 @@ socket.on('onlineCount', (count) => {
     onlineCountSpan.textContent = count;
 });
 
-// 🎵 Звук соединения
-function playBeep() {
+// ---------- Мягкий звук (короткий колокольчик) ----------
+function playSoftSound() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        gainNode.gain.value = 0.3;
-        oscillator.start();
-        setTimeout(() => {
-            oscillator.stop();
-            audioCtx.close();
-        }, 200);
+        const now = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        // Две ноты: 523 Гц (до) и 659 Гц (ми)
+        const osc1 = audioCtx.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523, now);
+        osc1.connect(gain);
+        osc1.start(now);
+        osc1.stop(now + 0.15);
+
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(659, now + 0.05);
+        osc2.connect(gain);
+        osc2.start(now + 0.05);
+        osc2.stop(now + 0.25);
+
+        // Завершаем контекст
+        setTimeout(() => audioCtx.close(), 400);
     } catch (e) {
-        console.warn('Не удалось воспроизвести звук', e);
+        console.warn('Звук не воспроизведён', e);
     }
+}
+
+// ---------- Звук при завершении чата ----------
+function playEndSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.3);
+        osc.connect(gain);
+        osc.start(now);
+        osc.stop(now + 0.3);
+        setTimeout(() => audioCtx.close(), 500);
+    } catch (e) { /* игнорируем */ }
+}
+
+// ---------- Индикатор набора ----------
+function showTyping() {
+    if (typingIndicator) typingIndicator.textContent = '✏️ Собеседник набирает сообщение...';
+}
+function hideTyping() {
+    if (typingIndicator) typingIndicator.textContent = '';
 }
 
 // ---------- Поиск ----------
@@ -60,7 +102,7 @@ socket.on('waiting', (data) => {
 });
 
 socket.on('connected', (data) => {
-    playBeep();
+    playSoftSound(); // звук при соединении
 
     currentRoomId = data.roomId;
     partnerId = data.partner;
@@ -76,7 +118,6 @@ socket.on('connected', (data) => {
     messagesDiv.innerHTML = '';
     appendMessage('system', 'Вы соединились с собеседником! Можно писать.');
 
-    // Разблокируем ввод
     messageInput.disabled = false;
     sendBtn.disabled = false;
     messageInput.focus();
@@ -87,12 +128,15 @@ socket.on('connected', (data) => {
 
 socket.on('message', (data) => {
     if (isChatEnded) return;
+    // Воспроизводим звук при получении сообщения
+    playSoftSound();
     appendMessage('other', data.text, data.timestamp);
 });
 
 socket.on('partner_left', (data) => {
     if (!isChatEnded) {
         appendMessage('system', data.message || 'Собеседник покинул чат.');
+        playEndSound(); // звук завершения
         endChat();
     }
 });
@@ -100,11 +144,38 @@ socket.on('partner_left', (data) => {
 socket.on('disconnected', (data) => {
     if (!isChatEnded) {
         appendMessage('system', data.message || 'Вы завершили чат.');
+        playEndSound();
         endChat();
     }
 });
 
-// ---------- Функция завершения чата (режим просмотра) ----------
+// ---------- Индикатор набора (от собеседника) ----------
+socket.on('typing', () => {
+    showTyping();
+});
+
+socket.on('stop_typing', () => {
+    hideTyping();
+});
+
+// ---------- Отправка события при наборе ----------
+messageInput.addEventListener('input', () => {
+    if (!currentRoomId || isChatEnded) return;
+    // Отправляем событие "печатает"
+    socket.emit('typing', { roomId: currentRoomId });
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+        socket.emit('stop_typing', { roomId: currentRoomId });
+    }, 1500);
+});
+
+messageInput.addEventListener('blur', () => {
+    if (currentRoomId) {
+        socket.emit('stop_typing', { roomId: currentRoomId });
+    }
+});
+
+// ---------- Завершение чата ----------
 function endChat() {
     isChatEnded = true;
     isConnected = false;
@@ -113,12 +184,12 @@ function endChat() {
 
     messageInput.disabled = true;
     sendBtn.disabled = true;
+    hideTyping();
 
     nextBtn.textContent = '🔄 Новый чат';
     nextBtn.onclick = startNewChat;
 }
 
-// ---------- Начать новый чат ----------
 function startNewChat() {
     mainScreen.style.display = 'block';
     chatScreen.style.display = 'none';
@@ -130,9 +201,9 @@ function startNewChat() {
     nextBtn.textContent = '➡️ Следующий';
     nextBtn.onclick = handleNext;
     messagesDiv.innerHTML = '';
+    hideTyping();
 }
 
-// ---------- Обработчик "Следующий" ----------
 function handleNext() {
     if (isChatEnded) {
         startNewChat();
@@ -157,6 +228,9 @@ function sendMessage() {
     appendMessage('self', text);
     socket.emit('message', { roomId: currentRoomId, text });
     messageInput.value = '';
+    // Останавливаем индикатор набора после отправки
+    socket.emit('stop_typing', { roomId: currentRoomId });
+    clearTimeout(typingTimer);
 }
 
 // ---------- Вспомогательная функция ----------
@@ -168,8 +242,3 @@ function appendMessage(type, text, timestamp = Date.now()) {
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
-document.getElementById('reportBtn').addEventListener('click', () => {
-  if (!partnerId) return;
-  const reason = prompt('Укажите причину жалобы (необязательно):');
-  socket.emit('report', { targetSocket: partnerId, reason: reason || 'Не указана' });
-});
