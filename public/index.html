@@ -9,20 +9,15 @@
 </head>
 <body>
     <div id="app">
-        <!-- Шапка -->
         <header>
             <div class="logo">🗣️ AnonChistopol</div>
-            <div class="subtitle">Анонимное общение для жителей Чистополя</div>
+            <!-- Убираем подзаголовок, который был ранее -->
         </header>
 
-        <!-- Главный экран (поиск) -->
         <main id="mainScreen">
             <div class="card">
                 <h2>Найдите собеседника</h2>
-                <p class="description">
-                    Этот сайт создан для жителей города Чистополь, чтобы вы могли анонимно общаться, 
-                    делиться мыслями и находить новых друзей. Без регистрации и без слежки.
-                </p>
+                <!-- Удаляем блок .description -->
                 <div class="filters">
                     <label>
                         Пол собеседника:
@@ -36,6 +31,7 @@
                         Возраст (примерно):
                         <select id="ageFilter">
                             <option value="any">Не важно</option>
+                            <option value="17-">17 и меньше</option>   <!-- новая опция -->
                             <option value="18-25">18–25</option>
                             <option value="26-35">26–35</option>
                             <option value="36-50">36–50</option>
@@ -48,16 +44,13 @@
             </div>
         </main>
 
-        <!-- Экран чата (изначально скрыт) -->
         <div id="chatScreen" style="display: none;">
             <div class="chat-container">
                 <div class="chat-header">
                     <span>Собеседник найден!</span>
                     <button id="nextBtn" class="btn-secondary">➡️ Следующий</button>
                 </div>
-                <div id="messages" class="messages">
-                    <!-- Сообщения будут появляться здесь -->
-                </div>
+                <div id="messages" class="messages"></div>
                 <div class="chat-input">
                     <input type="text" id="messageInput" placeholder="Введите сообщение..." />
                     <button id="sendBtn" class="btn-primary">Отправить</button>
@@ -65,9 +58,8 @@
             </div>
         </div>
 
-        <!-- Футер -->
         <footer>
-            <p>© 2025 AnonChistopol · Только для жителей Чистополя</p>
+            <p>© 2025 AnonChistopol ·</p>
         </footer>
     </div>
 
