@@ -15,7 +15,6 @@ const io = new Server(server, {
 const SESSIONS_FILE = './sessions.json';
 const MESSAGES_FILE = './messages.json';
 
-// Загружаем данные из файлов (или создаём пустые)
 function loadData(file) {
   try {
     if (fs.existsSync(file)) {
@@ -32,17 +31,8 @@ function saveData(file, data) {
 let sessions = loadData(SESSIONS_FILE);
 let messages = loadData(MESSAGES_FILE);
 
-// Вспомогательная функция для сохранения сессии
-function saveSession(session) {
-  // Ищем существующую
-  const index = sessions.findIndex(s => s.id === session.id);
-  if (index !== -1) {
-    sessions[index] = session;
-  } else {
-    sessions.push(session);
-  }
-  saveData(SESSIONS_FILE, sessions);
-}
+let nextSessionId = sessions.length > 0 ? Math.max(...sessions.map(s => s.id)) + 1 : 1;
+let nextMsgId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) + 1 : 1;
 
 // ---------- Middleware ----------
 app.use(express.static(path.join(__dirname, 'public')));
@@ -69,73 +59,32 @@ app.get('/admin', (req, res) => {
 });
 
 app.post('/admin', (req, res) => {
-    const { password } = req.body;
-    if (password !== ADMIN_PASSWORD) {
-        return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
-    }
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) {
+    return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
+  }
 
-    // Сортируем данные (новые сверху)
-    const sortedSessions = [...sessions].sort((a, b) => b.startTime - a.startTime).slice(0, 20);
-    const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-
-    let html = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>Логи</title>
-    <style>
-      body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
-      table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-      th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
-      th { background:#edf2f7; }
-      .section { margin-bottom:40px; }
-    </style>
-    </head>
-    <body>
-      <h1>📊 Админ-панель</h1>
-      <div class="section">
-        <h2>Последние сессии (20)</h2>
-        <table>
-          <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
-    `;
-    sortedSessions.forEach(s => {
-        const start = new Date(s.startTime).toLocaleString('ru-RU');
-        const end = s.endTime ? new Date(s.endTime).toLocaleString('ru-RU') : '—';
-        html += `<tr><td>${s.id}</td><td>${s.socketId}</td><td>${s.gender}</td><td>${s.age}</td><td>${start}</td><td>${end}</td><td>${s.messagesCount || 0}</td></tr>`;
-    });
-    html += `</table></div>`;
-
-    html += `<div class="section"><h2>Последние 50 сообщений</h2><table><tr><th>ID</th><th>Сессия</th><th>Пол</th><th>Возраст</th><th>Текст</th><th>Время</th></tr>`;
-    sortedMessages.forEach(m => {
-        const time = new Date(m.timestamp).toLocaleString('ru-RU');
-        const session = sessions.find(s => s.id === m.sessionId);
-        html += `<tr><td>${m.id}</td><td>${m.sessionId}</td><td>${session ? session.gender : '?'}</td><td>${session ? session.age : '?'}</td><td>${m.text}</td><td>${time}</td></tr>`;
-    });
-    html += `</table></div></body></html>`;
-    res.send(html);
-});
-
-  // Сортируем по времени (новые сверху)
-  const sortedSessions = [...sessions].sort((a,b) => b.startTime - a.startTime).slice(0, 20);
-  const sortedMessages = [...messages].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
+  const sortedSessions = [...sessions].sort((a, b) => b.startTime - a.startTime).slice(0, 20);
+  const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
 
   let html = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>Логи</title>
-    <style>
-      body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
-      table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-      th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
-      th { background:#edf2f7; }
-      .section { margin-bottom:40px; }
-    </style>
-    </head>
-    <body>
-      <h1>📊 Админ-панель</h1>
-      <div class="section">
-        <h2>Последние сессии (20)</h2>
-        <table>
-          <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
+  <!DOCTYPE html>
+  <html>
+  <head><meta charset="UTF-8"><title>Логи</title>
+  <style>
+    body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
+    table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
+    th { background:#edf2f7; }
+    .section { margin-bottom:40px; }
+  </style>
+  </head>
+  <body>
+    <h1>📊 Админ-панель</h1>
+    <div class="section">
+      <h2>Последние сессии (20)</h2>
+      <table>
+        <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
   `;
   sortedSessions.forEach(s => {
     const start = new Date(s.startTime).toLocaleString('ru-RU');
@@ -155,17 +104,13 @@ app.post('/admin', (req, res) => {
 });
 
 // ---------- Socket.IO логика ----------
-let nextSessionId = sessions.length > 0 ? Math.max(...sessions.map(s => s.id)) + 1 : 1;
-let nextMsgId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) + 1 : 1;
-
 const usersQueue = [];
 const activeRooms = new Map();
-const sessionMap = new Map(); // socketId -> sessionId
+const sessionMap = new Map();
 
 io.on('connection', (socket) => {
   console.log(`🔌 Подключился: ${socket.id}`);
 
-  // Создаём сессию
   const session = {
     id: nextSessionId++,
     socketId: socket.id,
@@ -181,7 +126,6 @@ io.on('connection', (socket) => {
 
   socket.on('find', (data) => {
     const { gender, age } = data;
-    // Обновляем сессию
     const sess = sessions.find(s => s.id === sessionMap.get(socket.id));
     if (sess) {
       sess.gender = gender || 'any';
@@ -213,10 +157,7 @@ io.on('connection', (socket) => {
       if (selfIndex !== -1) usersQueue.splice(selfIndex, 1);
 
       const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-      activeRooms.set(roomId, {
-        user1: socket.id,
-        user2: matchedUser.socketId
-      });
+      activeRooms.set(roomId, { user1: socket.id, user2: matchedUser.socketId });
 
       socket.join(roomId);
       io.sockets.sockets.get(matchedUser.socketId)?.join(roomId);
@@ -243,7 +184,6 @@ io.on('connection', (socket) => {
       messages.push(msg);
       saveData(MESSAGES_FILE, messages);
 
-      // Увеличиваем счётчик сообщений в сессии
       const sess = sessions.find(s => s.id === sessionId);
       if (sess) {
         sess.messagesCount = (sess.messagesCount || 0) + 1;
@@ -266,7 +206,6 @@ io.on('connection', (socket) => {
       activeRooms.delete(roomToLeave);
       socket.leave(roomToLeave);
     }
-    // Закрываем сессию
     const sessionId = sessionMap.get(socket.id);
     if (sessionId) {
       const sess = sessions.find(s => s.id === sessionId);
@@ -288,10 +227,8 @@ io.on('connection', (socket) => {
         saveData(SESSIONS_FILE, sessions);
       }
     }
-    // Удаляем из очереди
     const idx = usersQueue.findIndex(u => u.socketId === socket.id);
     if (idx !== -1) usersQueue.splice(idx, 1);
-    // Закрываем комнату
     for (const [roomId, { user1, user2 }] of activeRooms.entries()) {
       if (user1 === socket.id || user2 === socket.id) {
         const partnerId = user1 === socket.id ? user2 : user1;
