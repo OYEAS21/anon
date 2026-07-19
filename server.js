@@ -69,10 +69,50 @@ app.get('/admin', (req, res) => {
 });
 
 app.post('/admin', (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) {
-    return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
-  }
+    const { password } = req.body;
+    if (password !== ADMIN_PASSWORD) {
+        return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
+    }
+
+    // Сортируем данные (новые сверху)
+    const sortedSessions = [...sessions].sort((a, b) => b.startTime - a.startTime).slice(0, 20);
+    const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><title>Логи</title>
+    <style>
+      body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; }
+      table { border-collapse: collapse; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+      th, td { padding:10px 14px; text-align:left; border-bottom:1px solid #eef2f6; }
+      th { background:#edf2f7; }
+      .section { margin-bottom:40px; }
+    </style>
+    </head>
+    <body>
+      <h1>📊 Админ-панель</h1>
+      <div class="section">
+        <h2>Последние сессии (20)</h2>
+        <table>
+          <tr><th>ID</th><th>Socket</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщений</th></tr>
+    `;
+    sortedSessions.forEach(s => {
+        const start = new Date(s.startTime).toLocaleString('ru-RU');
+        const end = s.endTime ? new Date(s.endTime).toLocaleString('ru-RU') : '—';
+        html += `<tr><td>${s.id}</td><td>${s.socketId}</td><td>${s.gender}</td><td>${s.age}</td><td>${start}</td><td>${end}</td><td>${s.messagesCount || 0}</td></tr>`;
+    });
+    html += `</table></div>`;
+
+    html += `<div class="section"><h2>Последние 50 сообщений</h2><table><tr><th>ID</th><th>Сессия</th><th>Пол</th><th>Возраст</th><th>Текст</th><th>Время</th></tr>`;
+    sortedMessages.forEach(m => {
+        const time = new Date(m.timestamp).toLocaleString('ru-RU');
+        const session = sessions.find(s => s.id === m.sessionId);
+        html += `<tr><td>${m.id}</td><td>${m.sessionId}</td><td>${session ? session.gender : '?'}</td><td>${session ? session.age : '?'}</td><td>${m.text}</td><td>${time}</td></tr>`;
+    });
+    html += `</table></div></body></html>`;
+    res.send(html);
+});
 
   // Сортируем по времени (новые сверху)
   const sortedSessions = [...sessions].sort((a,b) => b.startTime - a.startTime).slice(0, 20);
