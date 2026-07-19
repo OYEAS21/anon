@@ -168,3 +168,8 @@ function appendMessage(type, text, timestamp = Date.now()) {
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
+document.getElementById('reportBtn').addEventListener('click', () => {
+  if (!partnerId) return;
+  const reason = prompt('Укажите причину жалобы (необязательно):');
+  socket.emit('report', { targetSocket: partnerId, reason: reason || 'Не указана' });
+});
