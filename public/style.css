@@ -460,7 +460,37 @@ body.dark footer {
     border-top-color: #4a5568;
     color: #718096;
 }
-
+/* Исправления для тёмной темы */
+body.dark .filters select {
+    background-color: #4a5568;
+    color: #e2e8f0;
+    border-color: #718096;
+}
+body.dark .filters select option {
+    background-color: #2d3748;
+    color: #e2e8f0;
+}
+body.dark .filters label {
+    color: #cbd5e0;
+}
+body.dark .status {
+    color: #a0aec0;
+}
+body.dark .chat-input input::placeholder {
+    color: #a0aec0;
+}
+body.dark .chat-header span {
+    color: #e2e8f0;
+}
+body.dark .online-info {
+    color: #cbd5e0;
+}
+body.dark #onlineCount {
+    color: #63b3ed;
+}
+body.dark .emoji-btn {
+    color: #e2e8f0;
+}
 /* Адаптив */
 @media (max-width: 480px) {
     #app {

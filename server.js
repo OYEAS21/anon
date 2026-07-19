@@ -7,7 +7,6 @@ const compression = require('compression');
 const https = require('https');
 const sqlite3 = require('sqlite3').verbose();
 const winston = require('winston');
-const { promisify } = require('util');
 
 // ---------- Логирование ----------
 const logger = winston.createLogger({
@@ -23,7 +22,7 @@ const logger = winston.createLogger({
   ]
 });
 
-// ---------- Инициализация приложения ----------
+// ---------- Инициализация ----------
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -39,13 +38,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ---------- База данных SQLite (с sqlite3) ----------
+// ---------- База данных ----------
 const db = new sqlite3.Database('./chat.db', (err) => {
   if (err) logger.error('Ошибка подключения к БД:', err);
   else logger.info('Подключено к SQLite');
 });
 
-// Обёртки для промисов
 const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
   db.run(sql, params, function(err) {
     if (err) reject(err);
@@ -65,9 +63,10 @@ const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
   });
 });
 
-// Создаём таблицы (асинхронно)
+// Создание/обновление таблиц
 async function initDb() {
   try {
+    // Создаём таблицу sessions (если её нет)
     await dbRun(`
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,6 +86,22 @@ async function initDb() {
         messagesCount INTEGER DEFAULT 0
       )
     `);
+    // Добавляем недостающие колонки (если таблица уже существовала)
+    const columns = await dbAll("PRAGMA table_info(sessions)");
+    const colNames = columns.map(c => c.name);
+    const addColumn = (name, type) => {
+      if (!colNames.includes(name)) {
+        dbRun(`ALTER TABLE sessions ADD COLUMN ${name} ${type}`);
+      }
+    };
+    addColumn('country', 'TEXT');
+    addColumn('city', 'TEXT');
+    addColumn('device', 'TEXT');
+    addColumn('os', 'TEXT');
+    addColumn('userAgent', 'TEXT');
+    addColumn('language', 'TEXT');
+    addColumn('referer', 'TEXT');
+
     await dbRun(`
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,7 +128,7 @@ async function initDb() {
         ip TEXT PRIMARY KEY
       )
     `);
-    logger.info('Таблицы созданы/проверены');
+    logger.info('Таблицы созданы/обновлены');
   } catch (err) {
     logger.error('Ошибка инициализации БД:', err);
   }
@@ -186,12 +201,11 @@ function escapeHtml(text) {
 }
 
 // ---------- Socket.IO ----------
-const usersQueue = []; // { socketId, gender, age }
+const usersQueue = [];
 const activeRooms = new Map();
-const sessionMap = new Map(); // socketId -> sessionId
+const sessionMap = new Map();
 let onlineCount = 0;
 
-// Функция для получения статистики из БД (асинхронная)
 async function getStatsFromDB() {
   const totalSessions = (await dbGet('SELECT COUNT(*) as count FROM sessions')).count;
   const totalMessages = (await dbGet('SELECT COUNT(*) as count FROM messages')).count;
@@ -226,7 +240,6 @@ async function getStatsFromDB() {
   };
 }
 
-// Отправка статистики в админ-комнату (асинхронно)
 async function broadcastStats() {
   try {
     const stats = await getStatsFromDB();
@@ -289,27 +302,143 @@ app.get('/admin', async (req, res) => {
       params.push(new Date(toDate).getTime());
     }
 
-    // Общее количество
     const countSql = `SELECT COUNT(*) as total FROM (${sql})`;
     const totalRow = await dbGet(countSql, params);
     const total = totalRow.total;
     const totalPages = Math.ceil(total / perPage);
 
-    // Пагинация
     const offset = (page - 1) * perPage;
     const dataSql = sql + ` ORDER BY startTime DESC LIMIT ? OFFSET ?`;
     const sessions = await dbAll(dataSql, [...params, perPage, offset]);
 
-    // Последние 50 сообщений
     const messages = await dbAll(`SELECT * FROM messages ORDER BY timestamp DESC LIMIT 50`);
 
     const stats = await getStatsFromDB();
 
-    // Генерация HTML (как в предыдущей версии)
-    let html = `...`; // Я не буду повторять весь HTML для краткости, он такой же как в предыдущем коде.
-    // Вставьте сюда полный HTML из предыдущего `server.js` (с экранированием), заменив вызовы статистики.
-    // Для экономии времени я дам ссылку на то, что вы можете скопировать HTML из моего прошлого ответа (там он был).
-    // Но я дам минимальный рабочий вариант.
+    // Формируем HTML для админки (полный код можно вставить, но я дам упрощённый для краткости)
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><title>Админ-панель</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', sans-serif; background:#f7f9fc; padding:20px; margin:0; }
+      .container { max-width:1400px; margin:0 auto; }
+      h1 { margin-bottom:20px; }
+      .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:14px; margin-bottom:30px; }
+      .stat-card { background:white; border-radius:12px; padding:14px 18px; box-shadow:0 4px 12px rgba(0,0,0,0.04); }
+      .stat-card .label { font-size:12px; color:#718096; }
+      .stat-card .value { font-size:22px; font-weight:700; color:#2d3748; }
+      .section { background:white; border-radius:12px; padding:20px; margin-bottom:24px; box-shadow:0 4px 12px rgba(0,0,0,0.04); }
+      .section h2 { margin-top:0; font-size:18px; border-bottom:1px solid #eef2f6; padding-bottom:10px; }
+      table { width:100%; border-collapse:collapse; font-size:13px; }
+      th { text-align:left; padding:8px 6px; background:#f7f9fc; }
+      td { padding:8px 6px; border-bottom:1px solid #edf2f7; }
+      .filters { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:16px; }
+      .filters label { display:flex; flex-direction:column; font-size:12px; gap:3px; }
+      .filters input, .filters select { padding:5px 8px; border-radius:6px; border:1px solid #e2e8f0; font-size:13px; }
+      .filters button { padding:5px 14px; background:#6b8cae; color:white; border:none; border-radius:6px; cursor:pointer; }
+      .pagination { display:flex; gap:6px; margin-top:14px; }
+      .pagination a, .pagination span { padding:5px 10px; background:#edf2f7; border-radius:6px; text-decoration:none; color:#2d3748; font-size:13px; }
+      .pagination .active { background:#6b8cae; color:white; }
+      .delete-btn { background:#e53e3e; color:white; border:none; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:11px; }
+      .ban-btn { background:#d69e2e; color:white; border:none; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:11px; }
+      @media (max-width:600px) { .stats { grid-template-columns:1fr 1fr; } }
+    </style>
+    </head>
+    <body>
+    <div class="container">
+      <h1>📊 Админ-панель AnonChistopol</h1>
+      <div class="stats">
+        <div class="stat-card"><div class="label">👥 Онлайн</div><div class="value">${stats.online}</div></div>
+        <div class="stat-card"><div class="label">📋 Сессий</div><div class="value">${stats.totalSessions}</div></div>
+        <div class="stat-card"><div class="label">💬 Сообщений</div><div class="value">${stats.totalMessages}</div></div>
+        <div class="stat-card"><div class="label">🔄 Чатов</div><div class="value">${stats.activeRooms}</div></div>
+        <div class="stat-card"><div class="label">⏳ Очередь</div><div class="value">${stats.waitingUsers}</div></div>
+        <div class="stat-card"><div class="label">⏱️ Сред. длит.</div><div class="value">${Math.round(stats.avgDuration)} мин</div></div>
+        <div class="stat-card"><div class="label">⚠️ Жалоб</div><div class="value">${stats.totalReports}</div></div>
+        <div class="stat-card"><div class="label">🚫 В чёрном списке</div><div class="value">${stats.blacklistCount}</div></div>
+      </div>
+      <div class="section">
+        <h2>📈 Распределение</h2>
+        <div style="display:flex; flex-wrap:wrap; gap:15px;">
+          <div><strong>Пол:</strong> ${Object.entries(stats.genderStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}</div>
+          <div><strong>Возраст:</strong> ${Object.entries(stats.ageStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}</div>
+          <div><strong>Устройства:</strong> ${Object.entries(stats.deviceStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}</div>
+          <div><strong>Страны:</strong> ${Object.entries(stats.geoStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}</div>
+        </div>
+      </div>
+      <div class="section">
+        <h2>🔍 Сессии</h2>
+        <form method="GET" action="/admin" class="filters">
+          <label>Поиск: <input type="text" name="search" value="${escapeHtml(search)}" placeholder="IP, страна..."></label>
+          <label>Пол: <select name="gender"><option value="all">Все</option><option value="male" ${genderFilter==='male'?'selected':''}>М</option><option value="female" ${genderFilter==='female'?'selected':''}>Ж</option><option value="any" ${genderFilter==='any'?'selected':''}>Не важно</option></select></label>
+          <label>Возраст: <select name="age"><option value="all">Все</option><option value="17-" ${ageFilter==='17-'?'selected':''}>17-</option><option value="18-25" ${ageFilter==='18-25'?'selected':''}>18-25</option><option value="26-35" ${ageFilter==='26-35'?'selected':''}>26-35</option><option value="36-50" ${ageFilter==='36-50'?'selected':''}>36-50</option><option value="50+" ${ageFilter==='50+'?'selected':''}>50+</option><option value="any" ${ageFilter==='any'?'selected':''}>Не важно</option></select></label>
+          <label>С: <input type="date" name="from" value="${escapeHtml(fromDate)}"></label>
+          <label>По: <input type="date" name="to" value="${escapeHtml(toDate)}"></label>
+          <button type="submit">Применить</button>
+          <a href="/admin" style="padding:5px 14px; background:#edf2f7; border-radius:6px; text-decoration:none; color:#2d3748;">Сбросить</a>
+        </form>
+        <table>
+          <tr><th>ID</th><th>IP</th><th>Страна</th><th>Устройство</th><th>ОС</th><th>Пол</th><th>Возраст</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th>Действие</th></tr>
+          ${sessions.map(s => `
+            <tr>
+              <td>${s.id}</td>
+              <td>${escapeHtml(s.ip || '—')}</td>
+              <td>${escapeHtml(s.country ? s.country + (s.city ? ', '+s.city : '') : '—')}</td>
+              <td>${escapeHtml(s.device || '—')}</td>
+              <td>${escapeHtml(s.os || '—')}</td>
+              <td>${escapeHtml(s.gender)}</td>
+              <td>${escapeHtml(s.age)}</td>
+              <td>${new Date(s.startTime).toLocaleString('ru-RU')}</td>
+              <td>${s.endTime ? new Date(s.endTime).toLocaleString('ru-RU') : '—'}</td>
+              <td>${s.messagesCount || 0}</td>
+              <td>
+                <form method="POST" action="/admin/delete-session" style="display:inline;" onsubmit="return confirm('Удалить сессию?');">
+                  <input type="hidden" name="sessionId" value="${s.id}">
+                  <button type="submit" class="delete-btn">Удалить</button>
+                </form>
+                <a href="/admin/session/${s.id}" style="font-size:11px;">Подробнее</a>
+                ${s.ip ? `<form method="POST" action="/admin/blacklist/add" style="display:inline;" onsubmit="return confirm('Заблокировать IP ${escapeHtml(s.ip)}?');"><input type="hidden" name="ip" value="${escapeHtml(s.ip)}"><button type="submit" class="ban-btn">Заблокировать</button></form>` : ''}
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="11">Нет сессий</td></tr>'}
+        </table>
+        <div class="pagination">
+          ${Array.from({length: totalPages}, (_, i) => i+1).map(p => `
+            <a href="/admin?page=${p}&search=${search}&gender=${genderFilter}&age=${ageFilter}&from=${fromDate}&to=${toDate}" class="${p===page?'active':''}">${p}</a>
+          `).join('')}
+        </div>
+      </div>
+      <div class="section">
+        <h2>💬 Последние 50 сообщений</h2>
+        <table>
+          <tr><th>ID</th><th>Сессия</th><th>Текст</th><th>Время</th><th>Действие</th></tr>
+          ${messages.map(m => `
+            <tr>
+              <td>${m.id}</td>
+              <td>${m.sessionId}</td>
+              <td>${escapeHtml(m.text)}</td>
+              <td>${new Date(m.timestamp).toLocaleString('ru-RU')}</td>
+              <td>
+                <form method="POST" action="/admin/delete-message" style="display:inline;" onsubmit="return confirm('Удалить сообщение?');">
+                  <input type="hidden" name="messageId" value="${m.id}">
+                  <button type="submit" class="delete-btn">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="5">Нет сообщений</td></tr>'}
+        </table>
+      </div>
+      <div class="section">
+        <h2>📥 Экспорт</h2>
+        <a href="/admin/export/sessions" style="padding:5px 14px; background:#6b8cae; color:white; border-radius:6px; text-decoration:none; margin-right:8px;">Сессии (CSV)</a>
+        <a href="/admin/export/messages" style="padding:5px 14px; background:#6b8cae; color:white; border-radius:6px; text-decoration:none;">Сообщения (CSV)</a>
+      </div>
+    </div>
+    </body>
+    </html>
+    `;
     res.send(html);
   } catch (err) {
     logger.error('Ошибка в админке:', err);
@@ -317,7 +446,7 @@ app.get('/admin', async (req, res) => {
   }
 });
 
-// ---------- Обработчики админки (удаление, экспорт, чёрный список) ----------
+// ---------- Обработчики админки ----------
 app.post('/admin/delete-session', async (req, res) => {
   const sessionId = req.body.sessionId;
   try {
@@ -384,8 +513,32 @@ app.get('/admin/session/:id', async (req, res) => {
     const session = await dbGet('SELECT * FROM sessions WHERE id = ?', [sessionId]);
     if (!session) return res.send('Сессия не найдена');
     const messages = await dbAll('SELECT * FROM messages WHERE sessionId = ? ORDER BY timestamp', [sessionId]);
-    // Генерация HTML (аналогично предыдущей версии)
-    let html = `...`; // вставьте полный HTML из предыдущего кода
+    let html = `
+    <!DOCTYPE html>
+    <html><head><meta charset="UTF-8"><title>Сессия ${sessionId}</title>
+    <style>body{font-family:sans-serif;background:#f7f9fc;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{padding:6px;border-bottom:1px solid #ddd;}</style>
+    </head>
+    <body>
+    <h1>Сессия #${sessionId}</h1>
+    <p><strong>Socket:</strong> ${escapeHtml(session.socketId)}</p>
+    <p><strong>IP:</strong> ${escapeHtml(session.ip || '—')}</p>
+    <p><strong>Страна:</strong> ${escapeHtml(session.country || '—')}, <strong>Город:</strong> ${escapeHtml(session.city || '—')}</p>
+    <p><strong>Устройство:</strong> ${escapeHtml(session.device || '—')}, <strong>ОС:</strong> ${escapeHtml(session.os || '—')}</p>
+    <p><strong>Браузер:</strong> ${escapeHtml(session.userAgent || '—')}</p>
+    <p><strong>Язык:</strong> ${escapeHtml(session.language || '—')}</p>
+    <p><strong>Referer:</strong> ${escapeHtml(session.referer || '—')}</p>
+    <p><strong>Пол:</strong> ${escapeHtml(session.gender)}, <strong>Возраст:</strong> ${escapeHtml(session.age)}</p>
+    <p><strong>Начало:</strong> ${new Date(session.startTime).toLocaleString()}</p>
+    <p><strong>Конец:</strong> ${session.endTime ? new Date(session.endTime).toLocaleString() : '—'}</p>
+    <p><strong>Сообщений:</strong> ${session.messagesCount || 0}</p>
+    <h3>Сообщения</h3>
+    <table><tr><th>#</th><th>Текст</th><th>Время</th></tr>
+    ${messages.map((m,i) => `<tr><td>${i+1}</td><td>${escapeHtml(m.text)}</td><td>${new Date(m.timestamp).toLocaleString()}</td></tr>`).join('')}
+    </table>
+    <a href="/admin">← Назад</a>
+    </body>
+    </html>
+    `;
     res.send(html);
   } catch (err) {
     logger.error('Ошибка при просмотре сессии:', err);
@@ -425,11 +578,10 @@ app.get('/admin/export/messages', async (req, res) => {
   }
 });
 
-// ---------- Socket.IO (с асинхронными вызовами) ----------
+// ---------- Socket.IO ----------
 io.on('connection', async (socket) => {
   const clientIp = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address || 'unknown';
 
-  // Проверка чёрного списка
   const blacklist = await dbAll('SELECT ip FROM blacklist');
   if (blacklist.some(row => row.ip === clientIp)) {
     socket.emit('blocked', { message: 'Ваш IP заблокирован.' });
@@ -457,13 +609,6 @@ io.on('connection', async (socket) => {
     sessionMap.set(socket.id, result.lastID);
   });
 
-  // Таймаут
-  socket.setTimeout(60000);
-  socket.on('timeout', () => {
-    logger.info(`Сокет ${socket.id} отключён по таймауту`);
-    socket.disconnect(true);
-  });
-
   socket.on('find', async (data) => {
     const { gender, age } = data;
     const sessionId = sessionMap.get(socket.id);
@@ -471,7 +616,6 @@ io.on('connection', async (socket) => {
       await dbRun(`UPDATE sessions SET gender = ?, age = ? WHERE id = ?`, [gender || 'any', age || 'any', sessionId]);
     }
 
-    // Удаляем старые записи из очереди
     for (let i = usersQueue.length - 1; i >= 0; i--) {
       if (usersQueue[i].socketId === socket.id) usersQueue.splice(i, 1);
     }
