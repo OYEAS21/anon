@@ -1,3 +1,4 @@
+/* Базовые стили (светлая тема) */
 * {
     margin: 0;
     padding: 0;
@@ -14,6 +15,12 @@ body {
     min-height: 100vh;
     margin: 0;
     padding: 16px;
+    transition: background 0.3s, color 0.3s;
+}
+
+body.dark {
+    background: #1a202c;
+    color: #e2e8f0;
 }
 
 #app {
@@ -26,6 +33,12 @@ body {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    transition: background 0.3s;
+}
+
+body.dark #app {
+    background: #2d3748;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
 }
 
 header {
@@ -33,8 +46,13 @@ header {
     border-bottom: 1px solid #eef2f6;
     padding-bottom: 16px;
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+body.dark header {
+    border-bottom-color: #4a5568;
 }
 
 .logo {
@@ -44,15 +62,40 @@ header {
     letter-spacing: -0.5px;
 }
 
+body.dark .logo {
+    color: #e2e8f0;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .online-info {
     font-size: 16px;
     color: #4a5568;
-    margin-top: 6px;
     font-weight: 500;
 }
+
+body.dark .online-info {
+    color: #a0aec0;
+}
+
 #onlineCount {
     font-weight: 700;
     color: #2b6cb0;
+}
+
+body.dark #onlineCount {
+    color: #63b3ed;
+}
+
+.theme-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
 }
 
 .card {
@@ -62,11 +105,19 @@ header {
     box-shadow: 0 4px 12px rgba(0,0,0,0.02);
 }
 
+body.dark .card {
+    background: #3a4a5f;
+}
+
 h2 {
     font-weight: 600;
     font-size: 22px;
     margin-bottom: 12px;
     color: #1a202c;
+}
+
+body.dark h2 {
+    color: #e2e8f0;
 }
 
 .filters {
@@ -86,6 +137,10 @@ h2 {
     flex: 1 0 160px;
 }
 
+body.dark .filters label {
+    color: #cbd5e0;
+}
+
 .filters select {
     padding: 10px 12px;
     border-radius: 12px;
@@ -99,6 +154,13 @@ h2 {
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 12px;
+}
+
+body.dark .filters select {
+    background: #4a5568;
+    border-color: #718096;
+    color: #e2e8f0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e2e8f0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
 }
 
 .filters select:focus {
@@ -150,6 +212,15 @@ h2 {
     background: #e2e8f0;
 }
 
+body.dark .btn-secondary {
+    background: #4a5568;
+    color: #e2e8f0;
+}
+
+body.dark .btn-secondary:hover {
+    background: #5a6a7a;
+}
+
 .status {
     margin-top: 16px;
     font-size: 15px;
@@ -169,6 +240,11 @@ h2 {
     border: 1px solid #eef2f6;
 }
 
+body.dark .chat-container {
+    background: #3a4a5f;
+    border-color: #4a5568;
+}
+
 .chat-header {
     display: flex;
     justify-content: space-between;
@@ -177,6 +253,14 @@ h2 {
     background: #f7f9fc;
     border-bottom: 1px solid #eef2f6;
     font-weight: 500;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+body.dark .chat-header {
+    background: #4a5568;
+    border-bottom-color: #5a6a7a;
+    color: #e2e8f0;
 }
 
 .messages {
@@ -189,6 +273,10 @@ h2 {
     background: #ffffff;
 }
 
+body.dark .messages {
+    background: #3a4a5f;
+}
+
 .message {
     max-width: 75%;
     padding: 10px 16px;
@@ -196,6 +284,12 @@ h2 {
     line-height: 1.5;
     word-break: break-word;
     font-size: 15px;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .message.self {
@@ -204,10 +298,20 @@ h2 {
     color: #1e3a5f;
 }
 
+body.dark .message.self {
+    background: #2b6cb0;
+    color: #e2e8f0;
+}
+
 .message.other {
     align-self: flex-start;
     background: #f1f4f9;
     color: #2d3748;
+}
+
+body.dark .message.other {
+    background: #4a5568;
+    color: #e2e8f0;
 }
 
 .message.system {
@@ -219,11 +323,27 @@ h2 {
     max-width: 90%;
 }
 
+body.dark .message.system {
+    color: #a0aec0;
+}
+
 .message .time {
     font-size: 11px;
     opacity: 0.6;
     margin-top: 4px;
     display: block;
+}
+
+.typing-indicator {
+    padding: 4px 16px;
+    font-size: 14px;
+    color: #718096;
+    font-style: italic;
+    min-height: 24px;
+}
+
+body.dark .typing-indicator {
+    color: #a0aec0;
 }
 
 .chat-input {
@@ -232,6 +352,13 @@ h2 {
     padding: 12px 16px;
     background: #f7f9fc;
     border-top: 1px solid #eef2f6;
+    position: relative;
+    flex-wrap: wrap;
+}
+
+body.dark .chat-input {
+    background: #4a5568;
+    border-top-color: #5a6a7a;
 }
 
 .chat-input input {
@@ -242,6 +369,13 @@ h2 {
     font-size: 15px;
     background: white;
     transition: 0.2s;
+    min-width: 100px;
+}
+
+body.dark .chat-input input {
+    background: #5a6a7a;
+    border-color: #718096;
+    color: #e2e8f0;
 }
 
 .chat-input input:focus {
@@ -253,6 +387,10 @@ h2 {
 .chat-input input:disabled {
     background: #f1f4f9;
     cursor: not-allowed;
+}
+
+body.dark .chat-input input:disabled {
+    background: #4a5568;
 }
 
 .chat-input .btn-primary {
@@ -267,6 +405,48 @@ h2 {
     cursor: not-allowed;
 }
 
+.emoji-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0 8px;
+}
+
+.emoji-picker {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 10px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 8px;
+    width: 250px;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    flex-wrap: wrap;
+    gap: 4px;
+    z-index: 10;
+}
+
+body.dark .emoji-picker {
+    background: #4a5568;
+    border-color: #718096;
+}
+
+.emoji-picker span {
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.1s;
+}
+
+.emoji-picker span:hover {
+    transform: scale(1.3);
+}
+
 footer {
     text-align: center;
     font-size: 13px;
@@ -276,75 +456,77 @@ footer {
     margin-top: 8px;
 }
 
+body.dark footer {
+    border-top-color: #4a5568;
+    color: #718096;
+}
+
 /* Адаптив */
 @media (max-width: 480px) {
     #app {
+        padding: 16px 12px;
+        border-radius: 20px;
+    }
+    .logo {
+        font-size: 22px;
+    }
+    .online-info {
+        font-size: 14px;
+    }
+    .card {
         padding: 20px 16px;
+    }
+    h2 {
+        font-size: 20px;
     }
     .filters label {
         flex: 1 0 100%;
     }
-    .chat-container {
-        height: 350px;
+    .filters select {
+        font-size: 14px;
+        padding: 8px 10px;
     }
-}
-/* Мобильная адаптация */
-@media (max-width: 480px) {
-  #app {
-    padding: 16px 12px;
-    border-radius: 20px;
-  }
-  .logo {
-    font-size: 24px;
-  }
-  .online-info {
-    font-size: 14px;
-  }
-  .card {
-    padding: 20px 16px;
-  }
-  h2 {
-    font-size: 20px;
-  }
-  .filters label {
-    flex: 1 0 100%;
-  }
-  .filters select {
-    font-size: 14px;
-    padding: 8px 10px;
-  }
-  .btn-primary {
-    font-size: 16px;
-    padding: 12px 20px;
-  }
-  .chat-container {
-    height: 70vh;
-  }
-  .messages {
-    padding: 12px;
-  }
-  .chat-input {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .chat-input input {
-    font-size: 14px;
-    padding: 10px 14px;
-  }
-  .chat-input .btn-primary {
-    font-size: 14px;
-    padding: 10px 16px;
-    width: 100%;
-  }
-  .chat-header {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .chat-header span {
-    font-size: 14px;
-  }
-  .btn-secondary {
-    font-size: 13px;
-    padding: 6px 14px;
-  }
+    .btn-primary {
+        font-size: 16px;
+        padding: 12px 20px;
+    }
+    .chat-container {
+        height: 70vh;
+    }
+    .messages {
+        padding: 12px;
+    }
+    .chat-input {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .chat-input input {
+        font-size: 14px;
+        padding: 10px 14px;
+        width: 100%;
+    }
+    .chat-input .btn-primary {
+        font-size: 14px;
+        padding: 10px 16px;
+        width: 100%;
+    }
+    .chat-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    .chat-header span {
+        font-size: 14px;
+    }
+    .btn-secondary {
+        font-size: 13px;
+        padding: 6px 14px;
+    }
+    .header-controls {
+        gap: 6px;
+    }
+    .emoji-picker {
+        width: 180px;
+        left: 0;
+    }
 }
