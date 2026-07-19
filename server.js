@@ -50,7 +50,7 @@ function getGeo(ip, callback) {
   if (ip === '::1' || ip === '127.0.0.1' || ip === 'unknown') {
     return callback({ country: 'Локальный', city: 'localhost' });
   }
-  const url = `http://ip-api.com/json/${ip}?fields=status,country,city&lang=ru`;
+  const url = `https://ip-api.com/json/${ip}?fields=status,country,city&lang=ru`;
   https.get(url, (res) => {
     let data = '';
     res.on('data', chunk => data += chunk);
