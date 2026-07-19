@@ -39,31 +39,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 app.use(express.json());
 
-// ---------- Админ-панель ----------
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-
+// ---------- Админ-панель (открытая) ----------
 app.get('/admin', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>Админ-панель</title></head>
-    <body style="font-family:sans-serif;background:#f7f9fc;padding:20px;">
-      <h2>📊 Логи сессий и сообщений</h2>
-      <form method="POST" action="/admin">
-        <label>Пароль: <input type="password" name="password" /></label>
-        <button type="submit">Войти</button>
-      </form>
-    </body>
-    </html>
-  `);
-});
-
-app.post('/admin', (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) {
-    return res.send('❌ Неверный пароль. <a href="/admin">Попробовать снова</a>');
-  }
-
   const sortedSessions = [...sessions].sort((a, b) => b.startTime - a.startTime).slice(0, 20);
   const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
 
@@ -103,7 +80,7 @@ app.post('/admin', (req, res) => {
   res.send(html);
 });
 
-// ---------- Socket.IO логика ----------
+// ---------- Socket.IO логика (полная) ----------
 const usersQueue = [];
 const activeRooms = new Map();
 const sessionMap = new Map();
