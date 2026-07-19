@@ -3,7 +3,7 @@ const socket = io();
 let currentRoomId = null;
 let partnerId = null;
 let isConnected = false;
-let isChatEnded = false; // флаг окончания чата (показ истории)
+let isChatEnded = false;
 
 const mainScreen = document.getElementById('mainScreen');
 const chatScreen = document.getElementById('chatScreen');
@@ -13,9 +13,15 @@ const sendBtn = document.getElementById('sendBtn');
 const messageInput = document.getElementById('messageInput');
 const messagesDiv = document.getElementById('messages');
 const statusMessage = document.getElementById('statusMessage');
+const onlineCountSpan = document.getElementById('onlineCount');
 
 const genderFilter = document.getElementById('genderFilter');
 const ageFilter = document.getElementById('ageFilter');
+
+// ---------- Онлайн-счётчик ----------
+socket.on('onlineCount', (count) => {
+    onlineCountSpan.textContent = count;
+});
 
 // 🎵 Звук соединения
 function playBeep() {
@@ -64,11 +70,9 @@ socket.on('connected', (data) => {
     statusMessage.textContent = '';
     findBtn.disabled = false;
 
-    // Переключаем экраны
     mainScreen.style.display = 'none';
     chatScreen.style.display = 'block';
 
-    // Очищаем сообщения (на случай, если остались от предыдущего чата)
     messagesDiv.innerHTML = '';
     appendMessage('system', 'Вы соединились с собеседником! Можно писать.');
 
@@ -77,19 +81,16 @@ socket.on('connected', (data) => {
     sendBtn.disabled = false;
     messageInput.focus();
 
-    // Восстанавливаем кнопку "Следующий"
     nextBtn.textContent = '➡️ Следующий';
-    nextBtn.onclick = handleNext; // назначаем обработчик
+    nextBtn.onclick = handleNext;
 });
 
 socket.on('message', (data) => {
-    // Если чат завершён, сообщения не должны приходить, но на всякий случай проверяем
     if (isChatEnded) return;
     appendMessage('other', data.text, data.timestamp);
 });
 
 socket.on('partner_left', (data) => {
-    // Собеседник ушёл – показываем историю, блокируем ввод
     if (!isChatEnded) {
         appendMessage('system', data.message || 'Собеседник покинул чат.');
         endChat();
@@ -97,58 +98,48 @@ socket.on('partner_left', (data) => {
 });
 
 socket.on('disconnected', (data) => {
-    // Мы сами завершили чат (нажали "Следующий")
     if (!isChatEnded) {
         appendMessage('system', data.message || 'Вы завершили чат.');
         endChat();
     }
 });
 
-// ---------- Функция завершения чата (переход в режим просмотра) ----------
+// ---------- Функция завершения чата (режим просмотра) ----------
 function endChat() {
     isChatEnded = true;
     isConnected = false;
     currentRoomId = null;
     partnerId = null;
 
-    // Блокируем ввод
     messageInput.disabled = true;
     sendBtn.disabled = true;
 
-    // Меняем кнопку "Следующий" на "Новый чат"
     nextBtn.textContent = '🔄 Новый чат';
     nextBtn.onclick = startNewChat;
 }
 
-// ---------- Начать новый чат (переход на главный экран) ----------
+// ---------- Начать новый чат ----------
 function startNewChat() {
-    // Возвращаемся на главный экран
     mainScreen.style.display = 'block';
     chatScreen.style.display = 'none';
     statusMessage.textContent = 'Выберите параметры и начните общение.';
-    // Сбрасываем флаги
     isChatEnded = false;
     isConnected = false;
     currentRoomId = null;
     partnerId = null;
-    // Восстанавливаем кнопку (на случай, если пользователь вернётся)
     nextBtn.textContent = '➡️ Следующий';
     nextBtn.onclick = handleNext;
-    // Очищаем сообщения (чтобы не висели)
     messagesDiv.innerHTML = '';
 }
 
-// ---------- Обработчик "Следующий" (активный чат) ----------
+// ---------- Обработчик "Следующий" ----------
 function handleNext() {
     if (isChatEnded) {
-        // Если по какой-то причине вызвалось, переключаем на новый чат
         startNewChat();
         return;
     }
     if (currentRoomId) {
         socket.emit('next');
-        // Сервер пришлёт 'disconnected' -> вызовется endChat()
-        // Мы также можем сразу показать статус, но лучше дождаться ответа сервера
         statusMessage.textContent = 'Завершаем чат...';
     }
 }
@@ -168,7 +159,7 @@ function sendMessage() {
     messageInput.value = '';
 }
 
-// ---------- Вспомогательная функция добавления сообщения ----------
+// ---------- Вспомогательная функция ----------
 function appendMessage(type, text, timestamp = Date.now()) {
     const div = document.createElement('div');
     div.className = `message ${type}`;

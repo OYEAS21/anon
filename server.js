@@ -80,14 +80,19 @@ app.get('/admin', (req, res) => {
   res.send(html);
 });
 
-// ---------- Socket.IO логика (полная) ----------
+// ---------- Socket.IO логика ----------
 const usersQueue = [];
 const activeRooms = new Map();
 const sessionMap = new Map();
+let onlineCount = 0;
 
 io.on('connection', (socket) => {
   console.log(`🔌 Подключился: ${socket.id}`);
+  onlineCount++;
+  io.emit('onlineCount', onlineCount);
+  console.log(`👥 Онлайн: ${onlineCount}`);
 
+  // Создаём сессию
   const session = {
     id: nextSessionId++,
     socketId: socket.id,
@@ -196,6 +201,10 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`❌ Отключился: ${socket.id}`);
+    onlineCount--;
+    io.emit('onlineCount', onlineCount);
+    console.log(`👥 Онлайн: ${onlineCount}`);
+
     const sessionId = sessionMap.get(socket.id);
     if (sessionId) {
       const sess = sessions.find(s => s.id === sessionId);
