@@ -50,7 +50,7 @@ app.use(cors());
 app.use(express.json());
 
 // ---------- Админ-панель ----------
-const ADMIN_PASSWORD = '1111'; // смените пароль!
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 app.get('/admin', (req, res) => {
   res.send(`
