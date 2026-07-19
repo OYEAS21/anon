@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnonChistopol — анонимный чат для Чистополя</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Шапка -->
+        <header>
+            <div class="logo">🗣️ AnonChistopol</div>
+            <div class="subtitle">Анонимное общение для жителей Чистополя</div>
+        </header>
+
+        <!-- Главный экран (поиск) -->
+        <main id="mainScreen">
+            <div class="card">
+                <h2>Найдите собеседника</h2>
+                <p class="description">
+                    Этот сайт создан для жителей города Чистополь, чтобы вы могли анонимно общаться, 
+                    делиться мыслями и находить новых друзей. Без регистрации и без слежки.
+                </p>
+                <div class="filters">
+                    <label>
+                        Пол собеседника:
+                        <select id="genderFilter">
+                            <option value="any">Не важно</option>
+                            <option value="male">Мужской</option>
+                            <option value="female">Женский</option>
+                        </select>
+                    </label>
+                    <label>
+                        Возраст (примерно):
+                        <select id="ageFilter">
+                            <option value="any">Не важно</option>
+                            <option value="18-25">18–25</option>
+                            <option value="26-35">26–35</option>
+                            <option value="36-50">36–50</option>
+                            <option value="50+">50+</option>
+                        </select>
+                    </label>
+                </div>
+                <button id="findBtn" class="btn-primary">🔍 Начать общение</button>
+                <div id="statusMessage" class="status"></div>
+            </div>
+        </main>
+
+        <!-- Экран чата (изначально скрыт) -->
+        <div id="chatScreen" style="display: none;">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <span>Собеседник найден!</span>
+                    <button id="nextBtn" class="btn-secondary">➡️ Следующий</button>
+                </div>
+                <div id="messages" class="messages">
+                    <!-- Сообщения будут появляться здесь -->
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Введите сообщение..." />
+                    <button id="sendBtn" class="btn-primary">Отправить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Футер -->
+        <footer>
+            <p>© 2025 AnonChistopol · Только для жителей Чистополя</p>
+        </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
